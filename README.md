@@ -9,13 +9,17 @@ El accidente cerebrovascular (ACV) es una de las principales causas de discapaci
 - Comparar los resultados obtenidos con investigaciones previas.
 
 ## Estructura del Repositorio
-- **`data/`**: Contiene los datos utilizados, incluyendo el archivo original (`stroke.csv`) y los datos procesados.
-- **`src/`**: Código fuente organizado por etapas:
-  - Preprocesamiento de datos.
+- **`Archivos/`**: Documento completo del TFM en formato PDF y reproducible en RMarkdown.
+- **`Datos/`**: Contiene los datos utilizados, incluyendo el archivo original (`stroke.csv`).
+- **`Resultados/`**: Resultados en forma de gráficos y tablas, incluyendo métricas y visualizaciones de los modelos.
+- **`Sources/`**: Código fuente organizado por etapas:
   - Análisis exploratorio y visualizaciones.
-  - Implementación de modelos y evaluación.
-- **`results/`**: Resultados en forma de gráficos y tablas, incluyendo métricas y visualizaciones de los modelos.
-- **`reports/`**: Documento completo del TFM en formato PDF y reproducible en RMarkdown.
+  - Preprocesamiento de datos.
+  - Evaluación de los modelos utilizados.
+  - Código del modelo Naive Bayes.
+  - Código del modelo Random Forest
+  - Código del modelo SVM
+- **`Licencia`**: Licencia del proyecto.  
 - **`README.md`**: Introducción y guía del proyecto.
 
 ## Tecnologías Utilizadas
