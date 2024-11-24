@@ -1,0 +1,84 @@
+#Cargar librerias
+```{r}
+library(caret) 
+library(ConfusionTableR)
+library(DataExplorer)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(kableExtra)
+library(ModelMetrics)
+library(openxlsx)
+library(plotly)
+library(probably) 
+library(pROC) 
+library(psych)
+library(purrr) 
+library(randomForest)
+library(reshape2)
+library(skimr) 
+library(stringr)
+library(tidymodels)
+library(tidyverse) 
+library(univariateML)
+library(vip) 
+library(xgboost)
+library(WRS2)
+library(corrplot)
+library(vcd)
+library(gtsummary)
+library(ROCR)
+library(kernlab)
+```
+
+### Cargar el dataset
+```{r}
+data = read.csv("stroke.csv")
+data %>% head() %>% kable %>% kable_styling()
+```
+
+### Cambio de nombre las variables para que todas empiecen por letra mayuscula
+```{r}
+names(data) = c("Id", "Gender", "Age", "Hypertension", "Heart_disease", "Ever_married", "Work_type", "Residence_type", "Avg_glucose_level", "BMI", "Smoking_status", "Stroke")
+data %>% head() %>% kable %>% kable_styling("striped", "bordered", "hover", full_width = TRUE, position = "center", font_size = 15) %>% row_spec(0, align = "center", bold = TRUE)
+```
+
+###Cambiar mi variable predictora de numérica a factor
+```{r}
+data = data %>%
+  mutate(Stroke_diagnosis = if_else(str_detect(Stroke, "0"), "Negative", "Positive")) %>%
+  mutate(Stroke_diagnosis = factor(Stroke_diagnosis, levels = c("Positive", "Negative"), labels = c("Positive", "Negative"))) %>%
+  relocate(Stroke_diagnosis, .before = Stroke) %>%
+  select(-Stroke)
+
+DT::datatable(data, rownames = FALSE, option = list(pageLength = 10, scrollx = TRUE), class = "white_space:nowrap")
+
+```
+
+###Establecer las variables que desee como factor
+```{r}
+columnas = c(2, 4:8, 11, 12)
+
+data[,columnas] = lapply(data[,columnas], as.factor)
+
+data$BMI = as.numeric(data$BMI)
+
+```
+
+###Comprobar si existen valores ausentes
+```{r}
+na_values = function(x){sum(is.na(x))}
+sapply(data, na_values)
+```
+
+###Vista general y rápida de los datos de BMI
+```{r}
+data$BMI
+```
+
+###Elimino la variable ID que no nos aporta ningún tipo de valor relevante
+```{r}
+data = data[ ,-1]
+data %>% head() %>% kable %>% kable_styling("striped", "bordered", "hover", full_width = TRUE, position = "center", font_size = 15) %>% row_spec(0, align = "center", bold = TRUE)
+
+```
