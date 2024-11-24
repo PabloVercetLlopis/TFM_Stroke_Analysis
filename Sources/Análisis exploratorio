@@ -1,0 +1,174 @@
+###GRAFICOS 
+
+####Variables Factor/Categóricas
+```{r}
+p1 = ggplot(data, aes(Gender)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p1)
+
+p3 = ggplot(data, aes(Hypertension)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p3)
+
+p4 = ggplot(data, aes(Heart_disease)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p4)
+
+p5 = ggplot(data, aes(Ever_married)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p5)
+
+p6 = ggplot(data, aes(Work_type)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p6)
+
+p7 = ggplot(data, aes(Residence_type)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p7)
+
+p10 = ggplot(data, aes(Smoking_status)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p10)
+
+```
+
+####Variables numéricas
+```{r}
+p2 = ggplot(data, aes(Stroke_diagnosis, Age)) + geom_boxplot(aes(fill = Stroke_diagnosis), show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p2)
+
+p8 = ggplot(data, aes(Stroke_diagnosis, Avg_glucose_level)) + geom_boxplot(aes(fill = Stroke_diagnosis), show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p8)
+
+p9 = ggplot(data, aes(Stroke_diagnosis, BMI)) + geom_boxplot(aes(fill = Stroke_diagnosis), show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p9)
+
+```
+
+```{r}
+summary(data$Age)
+```
+
+```{r}
+summary(data$Avg_glucose_level)
+```
+
+```{r}
+summary(data$BMI)
+```
+
+###Comparaciones 
+
+####Variables Factor/categóricas
+```{r}
+m = matrix(nrow = 7, ncol = 2, dimnames = list(colnames(data[,c(1,3:7, 10)]), c("p-valor","Coeficiente_V_de_Cramer")))
+
+for (i in c(1,3:7, 10)) {
+  tabla = table(data$Stroke_diagnosis,data[[i]]
+      )
+test = chisq.test(tabla)
+cramer = function(x){
+  unname(sqrt(chisq.test(x)$statistics/(sum(x)*(min(dim(x))-1))))
+
+  }
+
+m[colnames(data)[i], ]= c(round(test$p.value,4), round(cramer(tabla),4))
+
+}
+
+m = data.frame(m)
+
+formato = c("striped", "hover", "condensed")
+
+m %>% kable() %>% kable_styling(bootstrap_options = formato, 
+                                position = "center", 
+                                full_width = FALSE) %>%
+  column_spec(2, background = ifelse(m$p.valor > (0.05), "#ffda9e", "#fdf9c4"))
+
+```
+
+####Variables numéricas ###Variables ROBUSTAS
+
+```{r}
+tabla_p_valor_1 = matrix(nrow = 3, ncol = 1, dimnames = list(colnames(data[,c(2,8,9)]), c("p-valor")))
+
+for (i in c(2,8,9)) {
+  f= formula(paste(colnames(data)[i], "~Stroke_diagnosis"))
+  test = pb2gen(f, data = data, est = "median")
+  tabla_p_valor_1[colnames(data)[i], ] = c(test$p.value)
+}
+
+tabla_p_valor_1 %>% kable()%>% kable_styling("striped", "hover", "condensed", position = "center", full_width = FALSE)
+```
+
+###Cálculo estadísticos de las variables numéricas 
+#Stroke = 0
+```{r}
+stroke_0 = data |> filter(Stroke_diagnosis%in%c("Negative"))
+
+names_num = colnames(select_if(stroke_0, is.numeric))
+
+data_num_stroke_0 = stroke_0 |> dplyr::select(all_of(names_num))
+
+results_data_num_stroke_0 = NULL
+
+for (i in colnames(data_num_stroke_0)) {
+  median = median(data_num_stroke_0[[i]], na.rm = TRUE)
+  iqr = IQR(data_num_stroke_0[[i]], na.rm = TRUE)
+  row = data.frame("Variable" = i, "Median_Stroke_0" = median, "IQR_Stroke_0" = iqr)
+  results_data_num_stroke_0 = rbind(results_data_num_stroke_0, row)
+}
+rownames(results_data_num_stroke_0)=NULL
+results_data_num_stroke_0 %>% kable()%>% kable_styling(position = "center", full_width = FALSE)
+
+```
+
+#Stroke = 1
+```{r}
+stroke_1 = data |> filter(Stroke_diagnosis%in%c("Positive"))
+
+names_num = colnames(select_if(stroke_1, is.numeric))
+
+data_num_stroke_1 = stroke_1|> dplyr::select(all_of(names_num))
+
+results_data_num_stroke_1 = NULL
+
+for (i in colnames(data_num_stroke_1)) {
+  median = median(data_num_stroke_1[[i]], na.rm = TRUE)
+  iqr = IQR(data_num_stroke_1[[i]], na.rm = TRUE)
+  row = data.frame("Variable" = i, "Median_Stroke_1" = median, "IQR_Stroke_1" = iqr)
+  results_data_num_stroke_1 = rbind(results_data_num_stroke_1, row)
+}
+rownames(results_data_num_stroke_1)=NULL
+results_data_num_stroke_1 %>% kable()%>% kable_styling(position = "center", full_width = FALSE)
+```
+
+#tablas descriptivas
+```{r}
+descriptive_table = data.frame(
+  variable = c("Age", "Avg_glucose_level", "BMI"),
+  median_stroke_0 = results_data_num_stroke_0$Median_Stroke_0,
+  IQR_stroke_0 = results_data_num_stroke_0$IQR_Stroke_0,
+  median_stroke_1 = results_data_num_stroke_1$Median_Stroke_1,
+  IQR_stroke_1 = results_data_num_stroke_1$IQR_Stroke_1,
+  p_value = tabla_p_valor)
+
+descriptive_table
+
+names(descriptive_table) = c("Variable", "Median", "IQR", "Median", "IQR", "p-value")
+
+rownames(descriptive_table) = NULL
+
+descriptive_table
+
+kbl(descriptive_table,
+    caption = "Numerical variables") %>%
+  kable_paper("striped", full_width = FALSE) %>% 
+  add_header_above(c(" " = 1, "Negative" = 2, "Positive" = 2, " " = 1),
+                   italic = TRUE,
+                   align = "c",
+                   color = "white",
+                   background = "lightsalmon") %>%
+  column_spec(6, background = ifelse(tabla_p_valor > (0.05), "#ffda9e", "#fdf9c4")) %>%
+  footnote(general = "p-value < 0.05 significant")
+
+```
+
+###Sustitución de los N/A por la MEDIANA del resto de datos de BMI
+```{r}
+data$BMI[is.na(data$BMI)] = mean(data$BMI, na.rm = TRUE)
+data %>% head() %>% kable() %>% kable_styling("striped", "bordered", "hover", full_width = TRUE, position = "center", font_size = 15) %>% row_spec(0, align = "center", bold = TRUE)
+```
