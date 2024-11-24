@@ -1,0 +1,721 @@
+---
+title: "TFM"
+author: "Pablo Vercet"
+date: "2024-04-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot. ###Cargar librerias
+#Cargar librerias
+```{r}
+library(caret) # models, createDataPartition
+library(ConfusionTableR)
+library(DataExplorer)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(kableExtra)
+library(ModelMetrics)
+library(openxlsx)
+library(plotly)
+library(probably) # for balancing performance
+library(pROC) # AUC
+library(psych)
+library(purrr) # map
+library(randomForest)
+library(reshape2)
+library(skimr) # descriptive stats
+library(stringr)
+library(tidymodels)
+library(tidyverse) # %>%
+library(univariateML)
+library(vip) # for variable importance
+library(xgboost)
+library(WRS2)
+library(corrplot)
+library(vcd)
+library(gtsummary)
+library(ROCR)
+library(kernlab)
+
+```
+
+### Cargar el dataset
+
+```{r}
+data = read.csv("stroke.csv")
+data %>% head() %>% kable %>% kable_styling()
+```
+
+### Cambio de nombre las variables para que todas empiecen por letra mayuscula
+
+```{r}
+names(data) = c("Id", "Gender", "Age", "Hypertension", "Heart_disease", "Ever_married", "Work_type", "Residence_type", "Avg_glucose_level", "BMI", "Smoking_status", "Stroke")
+data %>% head() %>% kable %>% kable_styling("striped", "bordered", "hover", full_width = TRUE, position = "center", font_size = 15) %>% row_spec(0, align = "center", bold = TRUE)
+```
+
+```{r}
+str(data$Stroke)
+```
+
+###Cambiar mi variable predictora de numérica a factor
+
+```{r}
+data = data %>%
+  mutate(Stroke_diagnosis = if_else(str_detect(Stroke, "0"), "Negative", "Positive")) %>%
+  mutate(Stroke_diagnosis = factor(Stroke_diagnosis, levels = c("Positive", "Negative"), labels = c("Positive", "Negative"))) %>%
+  relocate(Stroke_diagnosis, .before = Stroke) %>%
+  select(-Stroke)
+
+DT::datatable(data, rownames = FALSE, option = list(pageLength = 10, scrollx = TRUE), class = "white_space:nowrap")
+
+```
+
+###Filas y columnas con las que estamos trabajando
+
+```{r}
+dim(data)
+```
+
+```{r}
+str(data)
+```
+
+###Establecer las variables que desee como factor
+
+```{r}
+columnas = c(2, 4:8, 11, 12)
+
+data[,columnas] = lapply(data[,columnas], as.factor)
+
+
+data$BMI = as.numeric(data$BMI)
+
+```
+
+```{r}
+str(data)
+```
+
+###Comprobar si existen valores ausentes
+
+```{r}
+na_values = function(x){sum(is.na(x))}
+sapply(data, na_values)
+```
+
+###Vista general y rápida de los datos de BMI
+
+```{r}
+data$BMI
+```
+
+###Elimino la variable ID que no nos aporta ningún tipo de valor relevante
+
+```{r}
+data = data[ ,-1]
+data %>% head() %>% kable %>% kable_styling("striped", "bordered", "hover", full_width = TRUE, position = "center", font_size = 15) %>% row_spec(0, align = "center", bold = TRUE)
+
+```
+
+###GRAFICOS 
+
+####Variables Factor/Categóricas
+
+```{r}
+p1 = ggplot(data, aes(Gender)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p1)
+
+p3 = ggplot(data, aes(Hypertension)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p3)
+
+p4 = ggplot(data, aes(Heart_disease)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p4)
+
+p5 = ggplot(data, aes(Ever_married)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p5)
+
+p6 = ggplot(data, aes(Work_type)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p6)
+
+p7 = ggplot(data, aes(Residence_type)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p7)
+
+p10 = ggplot(data, aes(Smoking_status)) + geom_bar(aes(fill = Stroke_diagnosis), color = "red", show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p10)
+
+
+
+```
+
+####Variables numéricas
+
+```{r}
+p2 = ggplot(data, aes(Stroke_diagnosis, Age)) + geom_boxplot(aes(fill = Stroke_diagnosis), show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p2)
+
+p8 = ggplot(data, aes(Stroke_diagnosis, Avg_glucose_level)) + geom_boxplot(aes(fill = Stroke_diagnosis), show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p8)
+
+p9 = ggplot(data, aes(Stroke_diagnosis, BMI)) + geom_boxplot(aes(fill = Stroke_diagnosis), show.legend = FALSE) + facet_wrap(~Stroke_diagnosis) + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(p9)
+
+
+```
+
+```{r}
+summary(data$Age)
+
+```
+
+```{r}
+summary(data$Avg_glucose_level)
+```
+
+```{r}
+summary(data$BMI)
+```
+
+###Comparaciones ####Variables Factor/categóricas
+
+```{r}
+
+m = matrix(nrow = 7, ncol = 2, dimnames = list(colnames(data[,c(1,3:7, 10)]), c("p-valor","Coeficiente_V_de_Cramer")))
+
+for (i in c(1,3:7, 10)) {
+  tabla = table(data$Stroke_diagnosis,data[[i]]
+      )
+test = chisq.test(tabla)
+cramer = function(x){
+  unname(sqrt(chisq.test(x)$statistics/(sum(x)*(min(dim(x))-1))))
+
+  }
+
+m[colnames(data)[i], ]= c(round(test$p.value,4), round(cramer(tabla),4))
+
+}
+
+m = data.frame(m)
+
+formato = c("striped", "hover", "condensed")
+
+m %>% kable() %>% kable_styling(bootstrap_options = formato, 
+                                position = "center", 
+                                full_width = FALSE) %>%
+  column_spec(2, background = ifelse(m$p.valor > (0.05), "#ffda9e", "#fdf9c4"))
+
+```
+
+####Variables numéricas ###Variables ROBUSTAS
+
+```{r}
+tabla_p_valor_1 = matrix(nrow = 3, ncol = 1, dimnames = list(colnames(data[,c(2,8,9)]), c("p-valor")))
+
+for (i in c(2,8,9)) {
+  f= formula(paste(colnames(data)[i], "~Stroke_diagnosis"))
+  test = pb2gen(f, data = data, est = "median")
+  tabla_p_valor_1[colnames(data)[i], ] = c(test$p.value)
+}
+
+tabla_p_valor_1 %>% kable()%>% kable_styling("striped", "hover", "condensed", position = "center", full_width = FALSE)
+```
+
+###Cálculo estadísticos de las variables numéricas #Stroke = 0
+
+```{r}
+stroke_0 = data |> filter(Stroke_diagnosis%in%c("Negative"))
+
+names_num = colnames(select_if(stroke_0, is.numeric))
+
+data_num_stroke_0 = stroke_0 |> dplyr::select(all_of(names_num))
+
+results_data_num_stroke_0 = NULL
+
+for (i in colnames(data_num_stroke_0)) {
+  median = median(data_num_stroke_0[[i]], na.rm = TRUE)
+  iqr = IQR(data_num_stroke_0[[i]], na.rm = TRUE)
+  row = data.frame("Variable" = i, "Median_Stroke_0" = median, "IQR_Stroke_0" = iqr)
+  results_data_num_stroke_0 = rbind(results_data_num_stroke_0, row)
+}
+rownames(results_data_num_stroke_0)=NULL
+results_data_num_stroke_0 %>% kable()%>% kable_styling(position = "center", full_width = FALSE)
+
+```
+
+#Stroke = 1
+
+```{r}
+stroke_1 = data |> filter(Stroke_diagnosis%in%c("Positive"))
+
+names_num = colnames(select_if(stroke_1, is.numeric))
+
+data_num_stroke_1 = stroke_1|> dplyr::select(all_of(names_num))
+
+results_data_num_stroke_1 = NULL
+
+for (i in colnames(data_num_stroke_1)) {
+  median = median(data_num_stroke_1[[i]], na.rm = TRUE)
+  iqr = IQR(data_num_stroke_1[[i]], na.rm = TRUE)
+  row = data.frame("Variable" = i, "Median_Stroke_1" = median, "IQR_Stroke_1" = iqr)
+  results_data_num_stroke_1 = rbind(results_data_num_stroke_1, row)
+}
+rownames(results_data_num_stroke_1)=NULL
+results_data_num_stroke_1 %>% kable()%>% kable_styling(position = "center", full_width = FALSE)
+```
+
+#tablas descriptivas
+
+```{r}
+descriptive_table = data.frame(
+  variable = c("Age", "Avg_glucose_level", "BMI"),
+  median_stroke_0 = results_data_num_stroke_0$Median_Stroke_0,
+  IQR_stroke_0 = results_data_num_stroke_0$IQR_Stroke_0,
+  median_stroke_1 = results_data_num_stroke_1$Median_Stroke_1,
+  IQR_stroke_1 = results_data_num_stroke_1$IQR_Stroke_1,
+  p_value = tabla_p_valor)
+
+
+descriptive_table
+
+names(descriptive_table) = c("Variable", "Median", "IQR", "Median", "IQR", "p-value")
+
+rownames(descriptive_table) = NULL
+
+descriptive_table
+
+
+kbl(descriptive_table,
+    caption = "Numerical variables") %>%
+  kable_paper("striped", full_width = FALSE) %>% 
+  add_header_above(c(" " = 1, "Negative" = 2, "Positive" = 2, " " = 1),
+                   italic = TRUE,
+                   align = "c",
+                   color = "white",
+                   background = "lightsalmon") %>%
+  column_spec(6, background = ifelse(tabla_p_valor > (0.05), "#ffda9e", "#fdf9c4")) %>%
+  footnote(general = "p-value < 0.05 significant")
+
+
+```
+
+###Sustitución de los N/A por la MEDIANA del resto de datos de BMI
+
+```{r}
+data$BMI[is.na(data$BMI)] = mean(data$BMI, na.rm = TRUE)
+data %>% head() %>% kable() %>% kable_styling("striped", "bordered", "hover", full_width = TRUE, position = "center", font_size = 15) %>% row_spec(0, align = "center", bold = TRUE)
+```
+
+#Modelo de Random Forest
+
+```{r}
+library(tidymodels)
+library(caret)
+library(ROCR)
+
+modelo_rf = NULL
+
+
+for (i in (1:10)){
+  set.seed(i)
+  train_row_numbers = createDataPartition(data$Stroke_diagnosis, p = 0.8, list = FALSE)
+  data_train = data[train_row_numbers, ]
+  data_test = data[-train_row_numbers, ]
+  
+  transformer = recipe(formula = Stroke_diagnosis ~ .,
+                       data = data_train) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_center(where(is.numeric)) %>%
+  step_scale(where(is.numeric))
+  
+  prep_data = prep(transformer)
+  data_train = bake(prep_data, new_data = data_train)
+  data_test = bake(prep_data, new_data = data_test)
+  
+  ctrl = trainControl(method = "cv",
+                      number = 10,
+                      returnResamp = "final",
+                      verboseIter = FALSE,
+                      summaryFunction = twoClassSummary,
+                      classProbs = TRUE,
+                      savePredictions = T,
+                      allowParallel = TRUE,
+                      sampling = "up")
+  
+  
+  tuneGrid = expand.grid(mtry = 1:10) 
+
+  set.seed(i)
+  rf_fit = train(Stroke_diagnosis ~ .,
+               data = data_train,
+               method = "rf",
+               metric = "ROC",
+               trControl = ctrl,
+               tuneGrid = tuneGrid,
+               )
+
+  
+  probs = seq(0.1, 0.9, by = 0.1)
+  set.seed(i)
+  ths_rf_fit = thresholder(rf_fit,
+                                threshold = probs,
+                                final = TRUE,
+                                statistics = "all") 
+
+  
+  ths_rf_fit %>%
+  mutate(prob = probs) %>%
+  filter(J == max(J)) %>%
+  pull(prob) -> thresh_prob_rf_fit
+  ths_rf_fit %>%
+  mutate(prob = probs) %>%
+  filter(J == max(J)) %>%
+  pull(J) -> max_J_train
+  preds = as.factor(ifelse(predict(rf_fit, data_test, type = "prob")[,"Positive"] >= thresh_prob_rf_fit,"Positive","Negative"))
+  real = factor(data_test$Stroke_diagnosis)
+  cm = ConfusionTableR::binary_class_cm(preds,
+                                        real,
+                                        mode = 'everything',
+                                        positive = 'Positive')
+  
+  
+  sensitivity = cm$confusion_matrix$byClass[1]
+  specificity = cm$confusion_matrix$byClass[2]
+  df = data.frame(preds = preds, real = real)
+  df$preds = as.numeric(ifelse(df$preds == "Positive", 1, 0))
+  df$real = as.numeric(ifelse(df$real == "Positive", 1, 0))
+  prediction = prediction(df$preds, df$real)
+  AUC = as.numeric(performance(prediction,"auc")@y.values)
+  row = data.frame(model = "Random forest",
+                   seed = i,
+                   probab = thresh_prob_rf_fit,
+                   max_J_train = max_J_train,
+                   sensitivity = sensitivity,
+                   specificity = specificity,
+                   AUC = AUC)
+  modelo_rf = rbind(modelo_rf, row)
+  
+}
+
+
+
+modelo_rf %>% kable() %>% kable_styling() 
+
+
+```
+
+###guardar modelo
+
+```{r}
+write.xlsx(modelo_rf, "RF_resultados_TFM.xlsx")
+
+```
+
+#Modelo Support Vector Machine linear
+
+```{r}
+modelo_svm = NULL
+
+
+for (i in (1:10)){
+  set.seed(i)
+  train_row_numbers = createDataPartition(data$Stroke_diagnosis, p = 0.8, list = FALSE)
+  data_train = data[train_row_numbers, ]
+  data_test = data[-train_row_numbers, ]
+  
+  transformer = recipe(formula = Stroke_diagnosis ~ .,
+                       data = data_train) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_center(where(is.numeric)) %>%
+  step_scale(where(is.numeric))
+  
+
+  prep_data = prep(transformer)
+  data_train = bake(prep_data, new_data = data_train)
+  data_test = bake(prep_data, new_data = data_test)
+  
+  ctrl = trainControl(method = "cv",
+                      number = 10,
+                      returnResamp = "final",
+                      verboseIter = FALSE,
+                      summaryFunction = twoClassSummary,
+                      classProbs = TRUE,
+                      savePredictions = T,
+                      allowParallel = TRUE,
+                      sampling = "up")
+  
+  
+  tuneGrid = expand.grid(C = seq(0, 2, length = 20))
+
+  set.seed(i)
+  svm_fit = train(Stroke_diagnosis ~ .,
+               data = data_train,
+               method = "svmLinear",
+               metric = "ROC",
+               trControl = ctrl,
+               tuneGrid = tuneGrid,
+               )
+
+  
+  probs = seq(0.1, 0.9, by = 0.1)
+  set.seed(i)
+  ths_svm_fit = thresholder(svm_fit,
+                                threshold = probs,
+                                final = TRUE,
+                                statistics = "all") 
+
+  
+  ths_svm_fit %>%
+  mutate(prob = probs) %>%
+  filter(J == max(J)) %>%
+  pull(prob) -> thresh_prob_svm_fit
+  ths_svm_fit %>%
+  mutate(prob = probs) %>%
+  filter(J == max(J)) %>%
+  pull(J) -> max_J_train
+  preds = as.factor(ifelse(predict(svm_fit, data_test, type = "prob")[,"Positive"] >= thresh_prob_svm_fit,"Positive","Negative"))
+  real = factor(data_test$Stroke_diagnosis)
+  cm = ConfusionTableR::binary_class_cm(preds,
+                                        real,
+                                        mode = 'everything',
+                                        positive = 'Positive')
+  
+  
+  sensitivity = cm$confusion_matrix$byClass[1]
+  specificity = cm$confusion_matrix$byClass[2]
+  df = data.frame(preds = preds, real = real)
+  df$preds = as.numeric(ifelse(df$preds == "Positive", 1, 0))
+  df$real = as.numeric(ifelse(df$real == "Positive", 1, 0))
+  prediction = prediction(df$preds, df$real)
+  AUC = as.numeric(performance(prediction,"auc")@y.values)
+  row = data.frame(model = "SVM",
+                   seed = i,
+                   probab = thresh_prob_svm_fit,
+                   max_J_train = max_J_train,
+                   sensitivity = sensitivity,
+                   specificity = specificity,
+                   AUC = AUC)
+  
+  modelo_svm = rbind(modelo_svm, row)
+  
+}
+
+
+modelo_svm %>% kable() %>% kable_styling()
+
+```
+
+###Guardar en excel
+
+```{r}
+write.xlsx(modelo_svm, "SVM_resultados_TFM.xlsx")
+
+```
+
+#Modelo Naives Bayes
+
+```{r}
+library(caret)
+library(caretEnsemble)
+
+modelo_NB = NULL
+
+
+for (i in (1:10)){
+  set.seed(i)
+  train_row_numbers = createDataPartition(data$Stroke_diagnosis, p = 0.8, list = FALSE)
+  data_train = data[train_row_numbers, ]
+  data_test = data[-train_row_numbers, ]
+  
+  transformer = recipe(formula = Stroke_diagnosis ~ .,
+                       data = data_train) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_center(where(is.numeric)) %>%
+  step_scale(where(is.numeric))
+  
+
+  prep_data = prep(transformer)
+  data_train = bake(prep_data, new_data = data_train)
+  data_test = bake(prep_data, new_data = data_test)
+  
+  ctrl = trainControl(method = "cv",
+                      number = 10,
+                      returnResamp = "final",
+                      verboseIter = FALSE,
+                      summaryFunction = twoClassSummary,
+                      classProbs = TRUE,
+                      savePredictions = T,
+                      allowParallel = TRUE,
+                      sampling = "up")
+  
+  
+  tuneGrid = expand.grid(usekernel = c(TRUE, FALSE), laplace = 0:5, adjust = seq(0,5,0.5))
+
+  set.seed(i)
+  NB_fit = train(Stroke_diagnosis ~ .,
+               data = data_train,
+               method = "naive_bayes",
+               metric = "ROC",
+               trControl = ctrl,
+               tuneGrid = tuneGrid,
+               )
+
+  
+  probs = seq(0.1, 0.9, by = 0.1)
+  set.seed(i)
+  ths_NB_fit = thresholder(NB_fit,
+                                threshold = probs,
+                                final = TRUE,
+                                statistics = "all") 
+
+  
+  ths_NB_fit %>%
+  mutate(prob = probs) %>%
+  filter(J == max(J)) %>%
+  pull(prob) -> thresh_prob_NB_fit
+  ths_NB_fit %>%
+  mutate(prob = probs) %>%
+  filter(J == max(J)) %>%
+  pull(J) -> max_J_train
+  preds = as.factor(ifelse(predict(NB_fit, data_test, type = "prob")[,"Positive"] >= thresh_prob_NB_fit,"Positive","Negative"))
+  real = factor(data_test$Stroke_diagnosis)
+  cm = ConfusionTableR::binary_class_cm(preds,
+                                        real,
+                                        mode = 'everything',
+                                        positive = 'Positive')
+  
+  
+  sensitivity = cm$confusion_matrix$byClass[1]
+  specificity = cm$confusion_matrix$byClass[2]
+  df = data.frame(preds = preds, real = real)
+  df$preds = as.numeric(ifelse(df$preds == "Positive", 1, 0))
+  df$real = as.numeric(ifelse(df$real == "Positive", 1, 0))
+  prediction = prediction(df$preds, df$real)
+  AUC = as.numeric(performance(prediction,"auc")@y.values)
+  row = data.frame(model = "Naive Bayes",
+                   seed = i,
+                   probab = thresh_prob_NB_fit,
+                   max_J_train = max_J_train,
+                   sensitivity = sensitivity,
+                   specificity = specificity,
+                   AUC = AUC)
+  
+  modelo_NB = rbind(modelo_NB, row)
+  
+}
+
+
+modelo_NB %>% kable() %>% kable_styling()
+```
+
+###Guardar en excel
+
+```{r}
+write.xlsx(modelo_NB, "NB_resultados_TFM_1.xlsx")
+
+```
+
+###Juntar los resultados
+
+```{r}
+resultados_juntos = rbind(modelo_rf, modelo_svm, modelo_NB)
+resultados_juntos %>% kable() %>% kable_styling()
+```
+
+###Eliminar columnas que no interesan
+
+```{r}
+resultados_juntos["X"] = NULL
+resultados_juntos["seed"] = NULL
+resultados_juntos["max_J_train"] = NULL
+resultados_juntos["probab"] = NULL
+
+resultados_juntos$model = as.factor(as.character(resultados_juntos$model))
+
+formato = c("striped", "hover", "responsive")
+resultados_juntos %>% kable() %>% kable_styling(bootstrap_options = formato, full_width = FALSE, position = "center", font_size = 12) %>% row_spec(0, bold = TRUE, color = "black", align = "center") %>% row_spec(1:nrow(resultados_juntos), bold = TRUE, color = "grey", align = "center")
+
+write.csv(resultados_juntos, "resultados_modelos_TFM.csv")
+```
+
+###Sensibilidad
+
+```{r}
+grafico_sensibilidad = ggplot(resultados_juntos, aes(x=model, y=resultados_juntos$sensitivity, fill=model)) + geom_boxplot() + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(grafico_sensibilidad)
+```
+
+```{r}
+sensibilidad = tapply(resultados_juntos$sensitivity, resultados_juntos$model, median)
+sensibilidad = data.frame(sensibilidad)
+names(sensibilidad) = c("Sensibilidad")
+```
+
+###Especificidad
+
+```{r}
+grafico_especificidad = ggplot(resultados_juntos, aes(x=model, y=resultados_juntos$specificity, fill=model)) + geom_boxplot() + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(grafico_especificidad)
+```
+
+```{r}
+especificidad = tapply(resultados_juntos$specificity, resultados_juntos$model, median)
+especificidad = data.frame(especificidad)
+names(especificidad) = c("Especificidad")
+```
+
+###AUC
+
+```{r}
+grafico_AUC = ggplot(resultados_juntos, aes(x=model, y=resultados_juntos$AUC, fill=model)) + geom_boxplot() + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(grafico_AUC)
+```
+
+```{r}
+AUC = tapply(resultados_juntos$AUC, resultados_juntos$model, median)
+AUC = data.frame(AUC)
+names(AUC) = c("AUC")
+
+```
+
+###Resultado final
+
+```{r}
+final = cbind(sensibilidad, especificidad, AUC)
+formato = c("striped", "bordered", "hover", "responsive")
+final %>% kable() %>% kable_styling(bootstrap_options = formato, full_width = FALSE, position = "center", font_size = 12)
+```
+
+###Comparar métricas
+
+```{r}
+comparación = melt(resultados_juntos, id.vars = "model", measure.vars = 2:4)
+
+ggplot(comparación, aes(x=model, y=value)) + geom_boxplot() + facet_wrap(~variable, nrow = 3, ncol = 1, scales = "free")
+```
+
+###Comparar medianas
+
+```{r}
+medianas = matrix(nrow = 3, ncol = 1, dimnames = list(colnames(resultados_juntos)[-1], c("p-valor")))
+medianas
+
+for (i in 2:4) {
+  f = formula(paste(colnames(resultados_juntos)[i], "~model"))
+  test = med1way(f, data = resultados_juntos)
+  medianas[colnames(resultados_juntos)[i], ] = c(round(test$p.value,4))
+}
+
+formato = c("striped", "bordered", "hover", "responsive")
+medianas %>% kable() %>% kable_styling(bootstrap_options = formato, full_width = FALSE, position = "center", font_size = 12)
+
+```
