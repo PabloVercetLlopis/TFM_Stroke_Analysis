@@ -1,0 +1,87 @@
+###Juntar los resultados
+```{r}
+resultados_juntos = rbind(modelo_rf, modelo_svm, modelo_NB)
+resultados_juntos %>% kable() %>% kable_styling()
+```
+
+###Eliminar columnas que no interesan
+```{r}
+resultados_juntos["X"] = NULL
+resultados_juntos["seed"] = NULL
+resultados_juntos["max_J_train"] = NULL
+resultados_juntos["probab"] = NULL
+
+resultados_juntos$model = as.factor(as.character(resultados_juntos$model))
+
+formato = c("striped", "hover", "responsive")
+resultados_juntos %>% kable() %>% kable_styling(bootstrap_options = formato, full_width = FALSE, position = "center", font_size = 12) %>% row_spec(0, bold = TRUE, color = "black", align = "center") %>% row_spec(1:nrow(resultados_juntos), bold = TRUE, color = "grey", align = "center")
+
+write.csv(resultados_juntos, "resultados_modelos_TFM.csv")
+```
+
+###Sensibilidad
+```{r}
+grafico_sensibilidad = ggplot(resultados_juntos, aes(x=model, y=resultados_juntos$sensitivity, fill=model)) + geom_boxplot() + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(grafico_sensibilidad)
+```
+
+```{r}
+sensibilidad = tapply(resultados_juntos$sensitivity, resultados_juntos$model, median)
+sensibilidad = data.frame(sensibilidad)
+names(sensibilidad) = c("Sensibilidad")
+```
+
+###Especificidad
+```{r}
+grafico_especificidad = ggplot(resultados_juntos, aes(x=model, y=resultados_juntos$specificity, fill=model)) + geom_boxplot() + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(grafico_especificidad)
+```
+
+```{r}
+especificidad = tapply(resultados_juntos$specificity, resultados_juntos$model, median)
+especificidad = data.frame(especificidad)
+names(especificidad) = c("Especificidad")
+```
+
+###AUC
+```{r}
+grafico_AUC = ggplot(resultados_juntos, aes(x=model, y=resultados_juntos$AUC, fill=model)) + geom_boxplot() + scale_fill_brewer(palette = 10) + theme_classic()
+ggplotly(grafico_AUC)
+```
+
+```{r}
+AUC = tapply(resultados_juntos$AUC, resultados_juntos$model, median)
+AUC = data.frame(AUC)
+names(AUC) = c("AUC")
+
+```
+
+###Resultado final
+```{r}
+final = cbind(sensibilidad, especificidad, AUC)
+formato = c("striped", "bordered", "hover", "responsive")
+final %>% kable() %>% kable_styling(bootstrap_options = formato, full_width = FALSE, position = "center", font_size = 12)
+```
+
+###Comparar métricas
+```{r}
+comparación = melt(resultados_juntos, id.vars = "model", measure.vars = 2:4)
+
+ggplot(comparación, aes(x=model, y=value)) + geom_boxplot() + facet_wrap(~variable, nrow = 3, ncol = 1, scales = "free")
+```
+
+###Comparar medianas
+```{r}
+medianas = matrix(nrow = 3, ncol = 1, dimnames = list(colnames(resultados_juntos)[-1], c("p-valor")))
+medianas
+
+for (i in 2:4) {
+  f = formula(paste(colnames(resultados_juntos)[i], "~model"))
+  test = med1way(f, data = resultados_juntos)
+  medianas[colnames(resultados_juntos)[i], ] = c(round(test$p.value,4))
+}
+
+formato = c("striped", "bordered", "hover", "responsive")
+medianas %>% kable() %>% kable_styling(bootstrap_options = formato, full_width = FALSE, position = "center", font_size = 12)
+
+```
