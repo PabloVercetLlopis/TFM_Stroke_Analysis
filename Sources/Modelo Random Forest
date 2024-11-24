@@ -1,0 +1,100 @@
+#Modelo de Random Forest
+
+```{r}
+library(tidymodels)
+library(caret)
+library(ROCR)
+
+modelo_rf = NULL
+
+
+for (i in (1:10)){
+  set.seed(i)
+  train_row_numbers = createDataPartition(data$Stroke_diagnosis, p = 0.8, list = FALSE)
+  data_train = data[train_row_numbers, ]
+  data_test = data[-train_row_numbers, ]
+  
+  transformer = recipe(formula = Stroke_diagnosis ~ .,
+                       data = data_train) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_center(where(is.numeric)) %>%
+  step_scale(where(is.numeric))
+  
+  prep_data = prep(transformer)
+  data_train = bake(prep_data, new_data = data_train)
+  data_test = bake(prep_data, new_data = data_test)
+  
+  ctrl = trainControl(method = "cv",
+                      number = 10,
+                      returnResamp = "final",
+                      verboseIter = FALSE,
+                      summaryFunction = twoClassSummary,
+                      classProbs = TRUE,
+                      savePredictions = T,
+                      allowParallel = TRUE,
+                      sampling = "up")
+  
+  
+  tuneGrid = expand.grid(mtry = 1:10) 
+
+  set.seed(i)
+  rf_fit = train(Stroke_diagnosis ~ .,
+               data = data_train,
+               method = "rf",
+               metric = "ROC",
+               trControl = ctrl,
+               tuneGrid = tuneGrid,
+               )
+
+  
+  probs = seq(0.1, 0.9, by = 0.1)
+  set.seed(i)
+  ths_rf_fit = thresholder(rf_fit,
+                                threshold = probs,
+                                final = TRUE,
+                                statistics = "all") 
+
+  
+  ths_rf_fit %>%
+  mutate(prob = probs) %>%
+  filter(J == max(J)) %>%
+  pull(prob) -> thresh_prob_rf_fit
+  ths_rf_fit %>%
+  mutate(prob = probs) %>%
+  filter(J == max(J)) %>%
+  pull(J) -> max_J_train
+  preds = as.factor(ifelse(predict(rf_fit, data_test, type = "prob")[,"Positive"] >= thresh_prob_rf_fit,"Positive","Negative"))
+  real = factor(data_test$Stroke_diagnosis)
+  cm = ConfusionTableR::binary_class_cm(preds,
+                                        real,
+                                        mode = 'everything',
+                                        positive = 'Positive')
+  
+  
+  sensitivity = cm$confusion_matrix$byClass[1]
+  specificity = cm$confusion_matrix$byClass[2]
+  df = data.frame(preds = preds, real = real)
+  df$preds = as.numeric(ifelse(df$preds == "Positive", 1, 0))
+  df$real = as.numeric(ifelse(df$real == "Positive", 1, 0))
+  prediction = prediction(df$preds, df$real)
+  AUC = as.numeric(performance(prediction,"auc")@y.values)
+  row = data.frame(model = "Random forest",
+                   seed = i,
+                   probab = thresh_prob_rf_fit,
+                   max_J_train = max_J_train,
+                   sensitivity = sensitivity,
+                   specificity = specificity,
+                   AUC = AUC)
+  modelo_rf = rbind(modelo_rf, row)
+  
+}
+
+modelo_rf %>% kable() %>% kable_styling() 
+
+```
+
+###guardar modelo
+```{r}
+write.xlsx(modelo_rf, "RF_resultados_TFM.xlsx")
+
+```
