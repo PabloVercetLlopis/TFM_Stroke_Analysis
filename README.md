@@ -35,12 +35,12 @@ El accidente cerebrovascular (ACV) es una de las principales causas de discapaci
 2. Instala las dependencias necesarias en R:
 install.packages(c("tidymodels", "caret", "ggplot2", "kableExtra", "randomForest", "e1071", "xgboost"))
 
-3.Ejecuta los scripts en el directorio src/ según las etapas:
-    Preprocesamiento: data_preprocessing.R
-    Análisis exploratorio: exploratory_analysis.R
-    Modelos predictivos: src/models/*.R
-    Evaluación de modelos: evaluation.R
-    Consulta los resultados en la carpeta results/.
+3.Ejecuta los scripts en el directorio Sources/ según las etapas:
+    Preprocesamiento
+    Análisis exploratorio
+    Modelos predictivos
+    Evaluación de modelos
+    Consulta los resultados en la carpeta Resultados/.
 
 ## Resultados Principales
 Modelo con mejor rendimiento: Support Vector Machine (SVM)
